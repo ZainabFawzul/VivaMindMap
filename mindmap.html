@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic Mind Map</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #002E26, #001009);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+        #toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            transition: background-color 0.2s ease, outline 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        button:focus, button.active {
+            outline: 2px solid #4D90FE;
+            background-color: rgba(77, 144, 254, 0.2);
+        }
+        button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        button img {
+            width: 24px;
+            height: 24px;
+            filter: brightness(0) saturate(100%) invert(87%) sepia(15%) saturate(474%) hue-rotate(359deg) brightness(92%) contrast(85%);
+        }
+
+        #question-display {
+            width: 80%;
+            max-width: 800px;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #DEBE62;
+            font-size: 1.1em;
+            line-height: 1.5;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        #mindmap-container {
+            position: relative;
+            background-color: #f0f0f0;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 1000px;
+            height: 80%;
+            max-height: 600px;
+            overflow: hidden;
+            cursor: grab;
+            flex-grow: 1;
+        }
+
+        #mindmap-container.dragging-canvas {
+            cursor: grabbing;
+        }
+
+        #mindmap-container.connecting-mode {
+            cursor: crosshair;
+        }
+
+        #mindmap-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            background-color: transparent;
+        }
+
+        .node {
+            position: absolute;
+            background-color: #4D90FE;
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 15px 20px;
+            min-width: 100px;
+            text-align: center;
+            cursor: grab;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            transition: border 0.1s ease-in-out;
+        }
+
+        .node.dragging {
+            cursor: grabbing;
+        }
+
+        .node.selected-for-branch {
+            border: 3px dashed #FFD700;
+        }
+
+        .node-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-width: 200px;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        .node.editing .node-text {
+            border: 1px dashed #ccc;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 2px;
+            border-radius: 4px;
+        }
+
+        .add-branch-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background-color: transparent;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 3;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .add-branch-btn img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .node:hover .add-branch-btn,
+        .node.target-selectable .add-branch-btn {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #format-palette {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 8px;
+            border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            color: #fff;
+            z-index: 1001;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #format-palette.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .palette-title {
+            display: none;
+        }
+
+        .format-options {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+
+        .format-option {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: border 0.2s ease, transform 0.2s ease;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .format-option:hover {
+            border-color: #4D90FE;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+            #toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            button {
+                width: 100%;
+                justify-content: flex-start;
+            }
+            #question-display {
+                width: 90%;
+                font-size: 1em;
+            }
+            #mindmap-container {
+                width: 95%;
+                height: 75%;
+            }
+            #format-palette {
+                width: auto;
+                max-width: 90%;
+            }
+            .format-options {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .format-option {
+                width: 36px;
+                height: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button id="create-node-btn" aria-label="Create New Node">
+            <img src="https://www.svgrepo.com/show/526894/chat-line.svg" alt="Create Node" />
+            Create
+        </button>
+        <button id="node-design-btn" aria-label="Node Design">
+            <img src="https://www.svgrepo.com/show/524125/pallete-2.svg" alt="Design" />
+            Design
+        </button>
+        <button id="undo-btn" aria-label="Undo">
+            <img src="https://www.svgrepo.com/show/526681/undo-left-round.svg" alt="Undo" />
+            Undo
+        </button>
+        <button id="redo-btn" aria-label="Redo">
+            <img src="https://www.svgrepo.com/show/526686/undo-right-round.svg" alt="Redo" />
+            Redo
+        </button>
+        <button id="clear-map-btn" aria-label="Clear Canvas">
+            <img src="https://www.svgrepo.com/show/526508/clipboard-remove.svg" alt="Clear Canvas" />
+            Clear
+        </button>
+        <button id="save-as-png-btn" aria-label="Save as PNG">
+            <img src="https://www.svgrepo.com/show/527079/gallery-download.svg" alt="Save as PNG" />
+            Save
+        </button>
+    </div>
+
+    <div id="question-display"></div>
+
+    <div id="mindmap-container">
+        <canvas id="mindmap-canvas"></canvas>
+        <div id="format-palette">
+            <div class="format-options">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mindmapContainer = document.getElementById('mindmap-container');
+        const canvas = document.getElementById('mindmap-canvas');
+        const ctx = canvas.getContext('2d');
+        const questionDisplay = document.getElementById('question-display');
+
+        let nodes = [];
+        let branches = [];
+        let history = [];
+        let historyPointer = -1;
+
+        const GRID_SIZE = 25;
+
+        let connectingSourceNodeId = null;
+        let lastInteractedNodeId = null;
+
+        let draggedNodeId = null;
+        let dragOffsetX, dragOffsetY;
+
+        let isCanvasDragging = false;
+        let dragStartCanvasX = 0;
+        let dragStartCanvasY = 0;
+        let initialCanvasOffsetX = 0;
+        let initialCanvasOffsetY = 0;
+        let canvasOffsetX = 0;
+        let canvasOffsetY = 0;
+
+        let questionText = "Build a mindmap that shows what questions you ask yourself during a suspicious interaction, what factors influence your decision, and where you might feel uncertain or unsure.";
+
+        const nodeFormats = [
+            { background: '#002E12', color: '#DEBE62', name: 'Forest' },
+            { background: '#426558', color: '#FFFFFF', name: 'Moss' },
+            { background: '#88B2A1', color: '#002E12', name: 'Mint' }
+        ];
+
+        function resizeCanvas() {
+            canvas.width = mindmapContainer.offsetWidth;
+            canvas.height = mindmapContainer.offsetHeight;
+            redrawAll();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const createNodeBtn = document.getElementById('create-node-btn');
+        const nodeDesignBtn = document.getElementById('node-design-btn');
+        const undoBtn = document.getElementById('undo-btn');
+        const redoBtn = document.getElementById('redo-btn');
+        const clearMapBtn = document.getElementById('clear-map-btn');
+        const saveAsPngBtn = document.getElementById('save-as-png-btn');
+        const formatPalette = document.getElementById('format-palette');
+        const formatOptionsContainer = formatPalette.querySelector('.format-options');
+
+        function generateId() {
+            return `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        }
+
+        function snapToGrid(value) {
+            return Math.round(value / GRID_SIZE) * GRID_SIZE;
+        }
+
+        function saveState() {
+            history = history.slice(0, historyPointer + 1);
+
+            const snapshot = {
+                nodes: nodes.map(node => ({
+                    id: node.id,
+                    x: node.x,
+                    y: node.y,
+                    text: node.text,
+                    background: node.background,
+                    color: node.color,
+                    isQuestion: node.isQuestion
+                })),
+                branches: branches.map(branch => ({
+                    id: branch.id,
+                    startNodeId: branch.startNodeId,
+                    endNodeId: branch.endNodeId
+                })),
+                canvasOffset: {
+                    x: canvasOffsetX,
+                    y: canvasOffsetY
+                }
+            };
+            history.push(snapshot);
+            historyPointer++;
+
+            if (history.length > 50) {
+                history.shift();
+                historyPointer--;
+            }
+            updateUndoRedoButtons();
+        }
+
+        function restoreState(snapshot) {
+            nodes.forEach(node => node.element.remove());
+
+            nodes.length = 0;
+            branches.length = 0;
+
+            if (snapshot.canvasOffset) {
+                canvasOffsetX = snapshot.canvasOffset.x;
+                canvasOffsetY = snapshot.canvasOffset.y;
+            } else {
+                canvasOffsetX = 0;
+                canvasOffsetY = 0;
+            }
+
+            snapshot.nodes.forEach(nodeData => {
+                const nodeDiv = document.createElement('div');
+                nodeDiv.className = 'node';
+                nodeDiv.id = nodeData.id;
+                nodeDiv.style.left = `${nodeData.x + canvasOffsetX}px`;
+                nodeDiv.style.top = `${nodeData.y + canvasOffsetY}px`;
+                nodeDiv.style.backgroundColor = nodeData.background || '#4D90FE';
+                nodeDiv.style.color = nodeData.color || '#ffffff';
+
+                const nodeTextSpan = document.createElement('span');
+                nodeTextSpan.className = 'node-text';
+                nodeTextSpan.contentEditable = nodeData.isQuestion ? 'false' : 'true';
+                nodeTextSpan.textContent = nodeData.text;
+                nodeTextSpan.spellcheck = false;
+                nodeDiv.appendChild(nodeTextSpan);
+
+                if (!nodeData.isQuestion) {
+                    const addBranchBtn = document.createElement('div');
+                    addBranchBtn.className = 'add-branch-btn';
+                    addBranchBtn.innerHTML = '<img src="https://www.svgrepo.com/show/526461/add-circle.svg" alt="Add Branch" />';
+                    nodeDiv.appendChild(addBranchBtn);
+                } else {
+                    nodeDiv.style.cursor = 'default';
+                }
+
+                mindmapContainer.appendChild(nodeDiv);
+
+                const restoredNode = {
+                    id: nodeData.id,
+                    x: nodeData.x,
+                    y: nodeData.y,
+                    text: nodeData.text,
+                    background: nodeData.background || '#4D90FE',
+                    color: nodeData.color || '#ffffff',
+                    element: nodeDiv,
+                    width: nodeDiv.offsetWidth,
+                    height: nodeDiv.offsetHeight,
+                    isQuestion: nodeData.isQuestion
+                };
+                nodes.push(restoredNode);
+                addNodeEventListeners(nodeDiv);
+
+                // No auto-focus or auto-editing here during restoreState
+                // This will be handled explicitly where new editable nodes are created by user action.
+
+                const exitEditing = () => {
+                    restoredNode.text = nodeTextSpan.textContent;
+                    nodeDiv.classList.remove('editing');
+                    requestAnimationFrame(() => {
+                        restoredNode.width = nodeDiv.offsetWidth;
+                        restoredNode.height = nodeDiv.offsetHeight;
+                        redrawBranches();
+                    });
+                    saveState();
+                };
+                const handleEnterKey = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        nodeTextSpan.blur();
+                    }
+                };
+
+                if (!nodeData.isQuestion) {
+                    nodeTextSpan.addEventListener('blur', exitEditing);
+                    nodeTextSpan.addEventListener('keydown', handleEnterKey);
+                }
+            });
+
+            branches.push(...snapshot.branches);
+
+            redrawAll();
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (historyPointer > 0) {
+                historyPointer--;
+                restoreState(history[historyPointer]);
+                resetConnectionMode();
+                hideFormatPalette();
+                blurActiveEditor();
+            }
+        }
+
+        function redo() {
+            if (historyPointer < history.length - 1) {
+                historyPointer++;
+                restoreState(history[historyPointer]);
+                resetConnectionMode();
+                hideFormatPalette();
+                blurActiveEditor();
+            }
+        }
+
+        function updateUndoRedoButtons() {
+            undoBtn.disabled = historyPointer <= 0;
+            redoBtn.disabled = historyPointer >= history.length - 1;
+        }
+
+        function renderWrappedTextOnCanvas(text, x, y, maxWidth, lineHeight, font, color, context) {
+            context.fillStyle = color;
+            context.font = font;
+            context.textAlign = 'center'; 
+            let currentY = y;
+
+            const paragraphs = text.split('\n');
+
+            paragraphs.forEach(paragraph => {
+                let words = paragraph.split(' ');
+                let currentLine = '';
+                let lineStartX = x; 
+
+                for (let i = 0; i < words.length; i++) {
+                    let testLine = currentLine + words[i] + ' ';
+                    let metrics = context.measureText(testLine);
+                    if (metrics.width > maxWidth && i > 0) {
+                        context.fillText(currentLine, lineStartX, currentY);
+                        currentLine = words[i] + ' ';
+                        currentY += lineHeight;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                context.fillText(currentLine, lineStartX, currentY);
+                currentY += lineHeight;
+            });
+        }
+
+        function calculateTextBounds(text, x, y, maxWidth, lineHeight, font, context) {
+            context.font = font;
+            const paragraphs = text.split('\n');
+            let lineCount = 0;
+            let actualWidth = 0;
+
+            paragraphs.forEach(paragraph => {
+                if (paragraph === "") {
+                    lineCount++;
+                    return;
+                }
+                let words = paragraph.split(' ');
+                let currentLine = '';
+                for (let i = 0; i < words.length; i++) {
+                    let testLine = currentLine + words[i] + ' ';
+                    let metrics = context.measureText(testLine);
+                    if (metrics.width > maxWidth && i > 0) {
+                        lineCount++;
+                        actualWidth = Math.max(actualWidth, context.measureText(currentLine).width);
+                        currentLine = words[i] + ' ';
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                lineCount++;
+                actualWidth = Math.max(actualWidth, context.measureText(currentLine).width);
+            });
+
+            const padding = 4;
+            const boxY = y - lineHeight + padding;
+            const boxHeight = lineCount * lineHeight;
+            const boxX = x - padding;
+
+            return {
+                x: boxX,
+                y: boxY,
+                width: actualWidth + (padding * 2),
+                height: boxHeight + (padding * 2)
+            };
+        }
+
+        function createNode(x, y, text = 'New Node', isQuestion = false, background = null, color = null) {
+            const nodeId = generateId();
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'node';
+            nodeDiv.id = nodeId;
+
+            let newBgColor = background || nodeFormats[2].background;
+            let newTextColor = color || nodeFormats[2].color;
+
+            if (lastInteractedNodeId && !isQuestion && !background) {
+                const sourceNode = nodes.find(n => n.id === lastInteractedNodeId);
+                if (sourceNode) {
+                    newBgColor = sourceNode.background;
+                    newTextColor = sourceNode.color;
+                }
+            }
+
+            const snappedX = snapToGrid(x);
+            const snappedY = snapToGrid(y);
+
+            nodeDiv.style.left = `${snappedX + canvasOffsetX}px`;
+            nodeDiv.style.top = `${snappedY + canvasOffsetY}px`;
+            nodeDiv.style.backgroundColor = newBgColor;
+            nodeDiv.style.color = newTextColor;
+
+            const nodeTextSpan = document.createElement('span');
+            nodeTextSpan.className = 'node-text';
+            nodeTextSpan.contentEditable = isQuestion ? 'false' : 'true';
+            nodeTextSpan.textContent = text;
+            nodeTextSpan.spellcheck = false;
+            nodeDiv.appendChild(nodeTextSpan);
+
+            if (!isQuestion) {
+                const addBranchBtn = document.createElement('div');
+                addBranchBtn.className = 'add-branch-btn';
+                addBranchBtn.innerHTML = '<img src="https://www.svgrepo.com/show/526461/add-circle.svg" alt="Add Branch" />';
+                nodeDiv.appendChild(addBranchBtn);
+            } else {
+                nodeDiv.style.cursor = 'default';
+            }
+
+            mindmapContainer.appendChild(nodeDiv);
+
+            const newNode = {
+                id: nodeId,
+                x: snappedX,
+                y: snappedY,
+                text: text,
+                background: newBgColor,
+                color: newTextColor,
+                element: nodeDiv,
+                width: nodeDiv.offsetWidth,
+                height: nodeDiv.offsetHeight,
+                isQuestion: isQuestion
+            };
+            nodes.push(newNode);
+
+            requestAnimationFrame(() => {
+                newNode.width = nodeDiv.offsetWidth;
+                newNode.height = nodeDiv.offsetHeight;
+                redrawBranches();
+            });
+
+            addNodeEventListeners(nodeDiv);
+
+            // Removed: automatic focus/editing here. This will now be explicitly controlled by the caller.
+
+            const exitEditing = () => {
+                newNode.text = nodeTextSpan.textContent;
+                nodeDiv.classList.remove('editing');
+                requestAnimationFrame(() => {
+                    newNode.width = nodeDiv.offsetWidth;
+                    newNode.height = nodeDiv.offsetHeight;
+                    redrawBranches();
+                });
+                saveState();
+            };
+
+            const handleEnterKey = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    nodeTextSpan.blur();
+                }
+            };
+
+            if (!isQuestion) {
+                nodeTextSpan.addEventListener('blur', exitEditing);
+                nodeTextSpan.addEventListener('keydown', handleEnterKey);
+            }
+
+            saveState();
+            return newNode;
+        }
+
+        function addNodeEventListeners(nodeElement) {
+            nodeElement.addEventListener('mousedown', (e) => {
+                const node = nodes.find(n => n.id === nodeElement.id);
+                if (node && node.isQuestion) {
+                    e.stopPropagation();
+                    return;
+                }
+
+                lastInteractedNodeId = nodeElement.id;
+                hideFormatPalette();
+
+                if (e.target.closest('.node-text') && e.target.closest('.node-text').contentEditable === 'true') {
+                    blurActiveEditor();
+                    if (!nodeElement.classList.contains('editing')) {
+                        nodeElement.classList.add('editing');
+                        e.target.closest('.node-text').focus();
+                    }
+                    e.stopPropagation();
+                    return;
+                }
+
+                if (e.target.classList.contains('add-branch-btn') || e.target.closest('.add-branch-btn')) {
+                    handleBranchButtonClick(nodeElement.id);
+                    e.stopPropagation();
+                    return;
+                }
+
+                if (connectingSourceNodeId !== null && nodeElement.id !== connectingSourceNodeId) {
+                    handleBranchButtonClick(nodeElement.id);
+                    e.stopPropagation();
+                    return;
+                }
+
+                draggedNodeId = nodeElement.id;
+                nodeElement.classList.add('dragging');
+
+                dragOffsetX = e.offsetX;
+                dragOffsetY = e.offsetY;
+
+                e.stopPropagation();
+            });
+        }
+
+        function handleBranchButtonClick(clickedNodeId) {
+            const clickedNode = nodes.find(n => n.id === clickedNodeId);
+
+            if (connectingSourceNodeId === null) {
+                connectingSourceNodeId = clickedNodeId;
+                clickedNode.element.classList.add('selected-for-branch');
+                mindmapContainer.classList.add('connecting-mode');
+
+                nodes.forEach(node => {
+                    if (node.id !== connectingSourceNodeId && !node.isQuestion) {
+                        node.element.classList.add('target-selectable');
+                    }
+                });
+            } else {
+                if (clickedNodeId === connectingSourceNodeId || nodes.find(n => n.id === clickedNodeId).isQuestion) {
+                    resetConnectionMode();
+                } else {
+                    const existingBranch = branches.some(b =>
+                        (b.startNodeId === connectingSourceNodeId && b.endNodeId === clickedNodeId) ||
+                        (b.startNodeId === clickedNodeId && b.endNodeId === connectingSourceNodeId)
+                    );
+
+                    if (!existingBranch) {
+                        branches.push({
+                            id: generateId(),
+                            startNodeId: connectingSourceNodeId,
+                            endNodeId: clickedNodeId
+                        });
+                        redrawBranches();
+                        saveState();
+                    }
+                    resetConnectionMode();
+                }
+            }
+        }
+
+        function resetConnectionMode() {
+            if (connectingSourceNodeId) {
+                const sourceNodeElement = document.getElementById(connectingSourceNodeId);
+                if (sourceNodeElement) {
+                    sourceNodeElement.classList.remove('selected-for-branch');
+                }
+            }
+            nodes.forEach(node => {
+                node.element.classList.remove('target-selectable');
+            });
+            connectingSourceNodeId = null;
+            mindmapContainer.classList.remove('connecting-mode');
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1;
+
+            for (let x = canvasOffsetX % GRID_SIZE; x <= canvas.width + Math.abs(canvasOffsetX); x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            for (let y = canvasOffsetY % GRID_SIZE; y <= canvas.height + Math.abs(canvasOffsetY); y += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function redrawBranches() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+
+            branches.forEach(branch => {
+                const startNode = nodes.find(n => n.id === branch.startNodeId);
+                const endNode = nodes.find(n => n.id === branch.endNodeId);
+
+                if (startNode && endNode) {
+                    const startX = startNode.x + startNode.width / 2 + canvasOffsetX;
+                    const startY = startNode.y + startNode.height / 2 + canvasOffsetY;
+                    const endX = endNode.x + endNode.width / 2 + canvasOffsetX;
+                    const endY = endNode.y + endNode.height / 2 + canvasOffsetY;
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            });
+        }
+
+        function redrawAll() {
+            redrawBranches();
+        }
+
+        function clearMindMap() {
+            saveState();
+
+            const nodesToKeep = nodes.filter(node => node.isQuestion);
+            const nodeIdsToKeep = new Set(nodesToKeep.map(node => node.id));
+            const branchesToKeep = branches.filter(branch => 
+                nodeIdsToKeep.has(branch.startNodeId) && nodeIdsToKeep.has(branch.endNodeId)
+            );
+
+            nodes.forEach(node => {
+                if (!node.isQuestion) {
+                    node.element.remove();
+                }
+            });
+
+            nodes = nodesToKeep;
+            branches = branchesToKeep;
+           
+            canvasOffsetX = 0;
+            canvasOffsetY = 0;
+            
+            nodes.forEach(node => {
+                node.element.style.left = `${node.x + canvasOffsetX}px`;
+                node.element.style.top = `${node.y + canvasOffsetY}px`;
+            });
+
+            redrawAll();
+            resetConnectionMode();
+            hideFormatPalette();
+            blurActiveEditor();
+            saveState();
+        }
+
+        function saveAsPNG() {
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvas.width;
+            exportCanvas.height = canvas.height;
+            const exportCtx = exportCanvas.getContext('2d');
+
+            exportCtx.fillStyle = '#f0f0f0';
+            exportCtx.fillRect(0, 0, exportCanvas.width, exportCtx.height);
+
+            const tempOffsetX = canvasOffsetX;
+            const tempOffsetY = canvasOffsetY;
+            canvasOffsetX = 0;
+            canvasOffsetY = 0;
+
+            exportCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            exportCtx.lineWidth = 1;
+            for (let x = 0; x <= exportCanvas.width; x += GRID_SIZE) {
+                exportCtx.beginPath();
+                exportCtx.moveTo(x, 0);
+                exportCtx.lineTo(x, exportCanvas.height);
+                exportCtx.stroke();
+            }
+            for (let y = 0; y <= exportCanvas.height; y += GRID_SIZE) {
+                exportCtx.beginPath();
+                exportCtx.moveTo(0, y);
+                exportCtx.lineTo(exportCanvas.width, y);
+                exportCtx.stroke();
+            }
+
+            branches.forEach(branch => {
+                const startNode = nodes.find(n => n.id === branch.startNodeId);
+                const endNode = nodes.find(n => n.id === branch.endNodeId);
+                if (startNode && endNode) {
+                    const startX = startNode.x + startNode.width / 2;
+                    const startY = startNode.y + startNode.height / 2;
+                    const endX = endNode.x + endNode.width / 2;
+                    const endY = endNode.y + endNode.height / 2;
+
+                    exportCtx.beginPath();
+                    exportCtx.moveTo(startX, startY);
+                    exportCtx.lineTo(endX, endY);
+                    exportCtx.strokeStyle = '#333';
+                    exportCtx.lineWidth = 3;
+                    exportCtx.stroke();
+                }
+            });
+
+            nodes.forEach(node => {
+                exportCtx.fillStyle = node.background;
+                exportCtx.beginPath();
+                exportCtx.roundRect(node.x, node.y, node.width, node.height, 8);
+                exportCtx.fill();
+
+                exportCtx.fillStyle = node.color;
+                
+                const nodeTextElement = node.element.querySelector('.node-text');
+                const computedStyle = window.getComputedStyle(nodeTextElement);
+
+                const nodeFontSize = parseFloat(computedStyle.fontSize);
+                const nodeFontFamily = computedStyle.fontFamily;
+                let nodeLineHeight = parseFloat(computedStyle.lineHeight);
+                if (isNaN(nodeLineHeight) || nodeLineHeight <= 0) {
+                    nodeLineHeight = nodeFontSize * 1.2; 
+                }
+
+                exportCtx.font = `${nodeFontSize}px ${nodeFontFamily}`;
+                exportCtx.textBaseline = 'alphabetic'; 
+
+                const nodeComputedStyle = window.getComputedStyle(node.element);
+                const horizontalPadding = parseFloat(nodeComputedStyle.paddingLeft) + parseFloat(nodeComputedStyle.paddingRight);
+                const exportTextMaxWidth = node.width - horizontalPadding; 
+
+                let totalWrappedTextHeight = 0;
+                const tempContext = document.createElement('canvas').getContext('2d');
+                tempContext.font = exportCtx.font; 
+
+                const tempParagraphs = node.text.split('\n');
+                tempParagraphs.forEach(paragraph => {
+                    let tempWords = paragraph.split(' ');
+                    let tempCurrentLine = '';
+                    if (paragraph === '') {
+                        totalWrappedTextHeight += nodeLineHeight;
+                        return;
+                    }
+                    for (let i = 0; i < tempWords.length; i++) {
+                        let testLine = tempCurrentLine + tempWords[i] + ' ';
+                        if (tempContext.measureText(testLine).width > exportTextMaxWidth && i > 0) {
+                            totalWrappedTextHeight += nodeLineHeight;
+                            tempCurrentLine = tempWords[i] + ' ';
+                        } else {
+                            tempCurrentLine = testLine;
+                        }
+                    }
+                    totalWrappedTextHeight += nodeLineHeight; 
+                });
+
+                const startTextY = node.y + (node.height / 2) - (totalWrappedTextHeight / 2) + (nodeFontSize * 0.7); 
+                
+                renderWrappedTextOnCanvas(
+                    node.text,
+                    node.x + node.width / 2, 
+                    startTextY, 
+                    exportTextMaxWidth,
+                    nodeLineHeight,
+                    exportCtx.font,
+                    node.color,
+                    exportCtx
+                );
+            });
+
+            canvasOffsetX = tempOffsetX;
+            canvasOffsetY = tempOffsetY;
+
+            const link = document.createElement('a');
+            link.href = exportCanvas.toDataURL('image/png');
+            link.download = 'mind_map.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function showFormatPalette() {
+            if (lastInteractedNodeId) {
+                const node = nodes.find(n => n.id === lastInteractedNodeId);
+                if (node && !node.isQuestion) {
+                    const nodeRect = node.element.getBoundingClientRect();
+                    const containerRect = mindmapContainer.getBoundingClientRect();
+
+                    let paletteX = nodeRect.left - containerRect.left;
+                    let paletteY = nodeRect.bottom - containerRect.top + 10;
+
+                    if (paletteX + formatPalette.offsetWidth > containerRect.width) {
+                        paletteX = containerRect.width - formatPalette.offsetWidth;
+                    }
+                    if (paletteY + formatPalette.offsetHeight > containerRect.height) {
+                        paletteY = nodeRect.top - containerRect.top - formatPalette.offsetHeight - 10;
+                    }
+
+                    formatPalette.style.left = `${Math.max(0, paletteX)}px`;
+                    formatPalette.style.top = `${Math.max(0, paletteY)}px`;
+                    formatPalette.classList.add('visible');
+                    renderFormatOptions();
+                } else {
+                    hideFormatPalette();
+                }
+            } else {
+                formatPalette.style.left = `${(mindmapContainer.offsetWidth / 2) - (formatPalette.offsetWidth / 2)}px`;
+                formatPalette.style.top = `${(mindmapContainer.offsetHeight / 2) - (formatPalette.offsetHeight / 2)}px`;
+                formatPalette.classList.add('visible');
+                renderFormatOptions();
+            }
+        }
+
+        function hideFormatPalette() {
+            formatPalette.classList.remove('visible');
+        }
+
+        function blurActiveEditor() {
+            const activeTextEditor = document.querySelector('.node.editing .node-text');
+            if (activeTextEditor) {
+                activeTextEditor.blur();
+                activeTextEditor.closest('.node').classList.remove('editing');
+            }
+        }
+
+        function renderFormatOptions() {
+            formatOptionsContainer.innerHTML = '';
+
+            nodeFormats.forEach(format => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'format-option';
+                optionDiv.style.backgroundColor = format.background;
+                optionDiv.setAttribute('title', format.name);
+
+                optionDiv.addEventListener('click', () => {
+                    if (lastInteractedNodeId) {
+                        const nodeToFormat = nodes.find(n => n.id === lastInteractedNodeId);
+                        if (nodeToFormat && !nodeToFormat.isQuestion) {
+                            nodeToFormat.background = format.background;
+                            nodeToFormat.color = format.color;
+                            nodeToFormat.element.style.backgroundColor = format.background;
+                            nodeToFormat.element.style.color = format.color;
+                            saveState();
+                        }
+                    }
+                    hideFormatPalette();
+                });
+                formatOptionsContainer.appendChild(optionDiv);
+            });
+        }
+
+        function displayQuestionText() {
+            questionDisplay.textContent = questionText;
+        }
+
+        const initialTemplate = [
+            { id: 'section1', type: 'node', x: 100, y: 100, text: 'Questions you ask yourself', isQuestion: true, background: nodeFormats[0].background, color: nodeFormats[0].color },
+            { id: 'section2', type: 'node', x: 400, y: 100, text: 'Factors that influence your decision', isQuestion: true, background: nodeFormats[0].background, color: nodeFormats[0].color },
+            { id: 'section3', type: 'node', x: 700, y: 100, text: 'Where you might hesitate or feel unsure', isQuestion: true, background: nodeFormats[0].background, color: nodeFormats[0].color },
+
+            { id: 'example1_1', type: 'node', x: 100, y: 250, text: 'Could this have a legitimate explanation?', isQuestion: false, background: nodeFormats[1].background, color: nodeFormats[1].color },
+            { id: 'example2_1', type: 'node', x: 400, y: 250, text: 'Strange client behaviour/ nervousness', isQuestion: false, background: nodeFormats[1].background, color: nodeFormats[1].color },
+            { id: 'example3_1', type: 'node', x: 700, y: 250, text: 'Longterm client with no previous red flag', isQuestion: false, background: nodeFormats[1].background, color: nodeFormats[1].color },
+
+            { type: 'branch', startNodeId: 'section1', endNodeId: 'section2' },
+            { type: 'branch', startNodeId: 'section2', endNodeId: 'section3' },
+            { type: 'branch', startNodeId: 'section1', endNodeId: 'example1_1' },
+            { type: 'branch', startNodeId: 'section2', endNodeId: 'example2_1' },
+            { type: 'branch', startNodeId: 'section3', endNodeId: 'example3_1' },
+        ];
+
+
+        function loadTemplate() {
+            const nodeCreationPromises = initialTemplate.map(item => {
+                if (item.type === 'node') {
+                    return new Promise(resolve => {
+                        // Pass a flag to createNode that it's being called from template load,
+                        // so it doesn't automatically enter edit mode.
+                        const newNode = createNode(item.x, item.y, item.text, item.isQuestion, item.background, item.color);
+                        requestAnimationFrame(() => {
+                            newNode.width = newNode.element.offsetWidth;
+                            newNode.height = newNode.element.offsetHeight;
+                            resolve(newNode);
+                        });
+                    });
+                }
+                return Promise.resolve(null);
+            });
+
+            Promise.all(nodeCreationPromises).then(() => {
+                initialTemplate.forEach(item => {
+                    if (item.type === 'branch') {
+                        const startNodeExists = nodes.some(n => n.id === item.startNodeId);
+                        const endNodeExists = nodes.some(n => n.id === item.endNodeId);
+                        if (startNodeExists && endNodeExists) {
+                            branches.push({ id: generateId(), startNodeId: item.startNodeId, endNodeId: item.endNodeId });
+                        }
+                    }
+                });
+                redrawAll();
+                saveState();
+            });
+        }
+
+
+        createNodeBtn.addEventListener('click', () => {
+            const containerRect = mindmapContainer.getBoundingClientRect();
+            const x = snapToGrid((containerRect.width / 2) - 75 + (Math.random() * 50 - 25) - canvasOffsetX);
+            const y = snapToGrid((containerRect.height / 2) - 25 + (Math.random() * 50 - 25) - canvasOffsetY);
+            
+            // Explicitly set the newly created node to edit mode here
+            const newNode = createNode(x, y, 'New Node', false); // False for isQuestion to make it editable
+            
+            blurActiveEditor(); // Ensure any existing editor is blurred
+            newNode.element.classList.add('editing');
+            newNode.element.querySelector('.node-text').focus();
+            document.execCommand('selectAll', false, null);
+
+            resetConnectionMode();
+            hideFormatPalette();
+            saveState(); // Save state after node creation and potential edit mode entry
+        });
+
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+        clearMapBtn.addEventListener('click', clearMindMap);
+        saveAsPngBtn.addEventListener('click', saveAsPNG);
+
+        nodeDesignBtn.addEventListener('click', () => {
+            showFormatPalette();
+        });
+
+        mindmapContainer.addEventListener('mousedown', (e) => {
+            if (formatPalette.classList.contains('visible') && !formatPalette.contains(e.target)) {
+                hideFormatPalette();
+            }
+
+            const activeTextEditor = document.querySelector('.node.editing .node-text');
+            if (activeTextEditor && !activeTextEditor.contains(e.target)) {
+                activeTextEditor.blur();
+            }
+
+            if (!e.target.closest('.node') && !e.target.closest('#toolbar') && !formatPalette.contains(e.target) && e.target !== questionDisplay) {
+                isCanvasDragging = true;
+                mindmapContainer.classList.add('dragging-canvas');
+                dragStartCanvasX = e.clientX;
+                dragStartCanvasY = e.clientY;
+                initialCanvasOffsetX = canvasOffsetX;
+                initialCanvasOffsetY = canvasOffsetY;
+                e.preventDefault();
+            }
+        });
+
+        mindmapContainer.addEventListener('mousemove', (e) => {
+            if (isCanvasDragging) {
+                const dx = e.clientX - dragStartCanvasX;
+                const dy = e.clientY - dragStartCanvasY;
+
+                canvasOffsetX = initialCanvasOffsetX + dx;
+                canvasOffsetY = initialCanvasOffsetY + dy;
+
+                nodes.forEach(node => {
+                    node.element.style.left = `${node.x + canvasOffsetX}px`;
+                    node.element.style.top = `${node.y + canvasOffsetY}px`;
+                });
+
+                redrawAll();
+            } else if (draggedNodeId !== null) {
+                const node = nodes.find(n => n.id === draggedNodeId);
+                if (node && !node.isQuestion) {
+                    const containerRect = mindmapContainer.getBoundingClientRect();
+                    const mouseX = e.clientX - containerRect.left;
+                    const mouseY = e.clientY - containerRect.top;
+
+                    let rawNewAbsX = mouseX - dragOffsetX;
+                    let rawNewAbsY = mouseY - dragOffsetY;
+
+                    let snappedAbsX = snapToGrid(rawNewAbsX);
+                    let snappedAbsY = snapToGrid(rawNewAbsY);
+
+                    node.x = snappedAbsX;
+                    node.y = snappedAbsY;
+
+                    node.element.style.left = `${node.x + canvasOffsetX}px`;
+                    node.element.style.top = `${node.y + canvasOffsetY}px`;
+
+                    redrawBranches();
+                }
+            }
+        });
+
+        mindmapContainer.addEventListener('mouseup', () => {
+            if (isCanvasDragging) {
+                isCanvasDragging = false;
+                mindmapContainer.classList.remove('dragging-canvas');
+                saveState();
+            } else if (draggedNodeId !== null) {
+                const nodeElement = document.getElementById(draggedNodeId);
+                if (nodeElement) nodeElement.classList.remove('dragging');
+                saveState();
+            }
+            draggedNodeId = null;
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                let sourceNode = null;
+
+                const editingNodeElement = document.querySelector('.node.editing');
+                if (editingNodeElement) {
+                    sourceNode = nodes.find(n => n.id === editingNodeElement.id);
+                } else if (lastInteractedNodeId) {
+                    sourceNode = nodes.find(n => n.id === lastInteractedNodeId);
+                }
+
+                if (sourceNode && !sourceNode.isQuestion) {
+                    e.preventDefault();
+                    resetConnectionMode();
+                    hideFormatPalette();
+
+                    const newX = sourceNode.x + sourceNode.width + GRID_SIZE * 2;
+                    const newY = sourceNode.y;
+
+                    const boundedX = snapToGrid(newX);
+                    const boundedY = snapToGrid(newY);
+
+                    // Create the new node and then explicitly set it to edit mode
+                    const newNode = createNode(boundedX, boundedY, 'New Node', false); 
+                    
+                    blurActiveEditor(); // Blur any other active editor
+                    newNode.element.classList.add('editing');
+                    newNode.element.querySelector('.node-text').focus();
+                    document.execCommand('selectAll', false, null); // Select all text for easy replacement
+
+                    branches.push({
+                        id: generateId(),
+                        startNodeId: sourceNode.id,
+                        endNodeId: newNode.id
+                    });
+                    redrawBranches();
+                    saveState();
+                }
+            }
+        });
+
+        loadTemplate();
+        displayQuestionText();
+    </script>
+</body>
+</html>
